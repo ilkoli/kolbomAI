@@ -1437,131 +1437,174 @@
  return models.find(m => m.id === session?.modelId) || models[0] || { modelKey: 'mock-engine', apiKey: '', label: '무료 시뮬레이션' };
  }
 
-    function renderChatMessages() {
-      if (!currentSessionId) return;
-      const session = getCurrentSession();
-      const chars = JSON.parse(localStorage.getItem('crack_characters') || '[]');
-      const char = chars.find(c => c.id === session?.characterId);
-      const messages = JSON.parse(localStorage.getItem(`chat_history_${currentSessionId}`) || '[]');
-      const activePersona = getActivePersonaForCurrentRoom();
-      const container = document.getElementById('kakao-messages');
+function renderChatMessages() {
+  if (!currentSessionId) return;
+  const session = getCurrentSession();
+  const chars = JSON.parse(localStorage.getItem('crack_characters') || '[]');
+  const char = chars.find(c => c.id === session?.characterId);
+  const messages = JSON.parse(localStorage.getItem(`chat_history_${currentSessionId}`) || '[]');
+  const activePersona = getActivePersonaForCurrentRoom();
+  const container = document.getElementById('kakao-messages');
 
-      container.innerHTML = messages.map((msg, index) => {
-        const isUser = msg.role === 'user';
-        const isLastAssistant = !isUser && index === messages.length - 1;
+  // 마지막 assistant 메시지 인덱스 탐색
+  let lastAssistantIdx = -1;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role !== 'user') {
+      lastAssistantIdx = i;
+      break;
+    }
+  }
 
-        const variants = (!isUser && msg.variants && msg.variants.length) ? msg.variants : [msg.content];
-        const activeVariantIdx = (!isUser && typeof msg.activeVariantIndex === 'number')
-          ? Math.min(Math.max(msg.activeVariantIndex, 0), variants.length - 1)
-          : variants.length - 1;
-        const displayContent = isUser ? msg.content : variants[activeVariantIdx];
+  container.innerHTML = messages.map((msg, index) => {
+    const isUser = msg.role === 'user';
+    const isLastAssistant = (index === lastAssistantIdx);
 
-        return `
-          <div class="flex flex-col ${isUser ? 'items-end' : 'items-start'} gap-0.5 relative group">
-            <span class="text-[10px] ${isKakaoDark ? 'text-zinc-400' : 'text-slate-600'} font-medium px-1">
-              ${isUser ? escapeHtml(activePersona.name) : (char?.name || 'AI')} ${msg.bookmarked ? '⭐' : ''}
-            </span>
-            
-            <div class="flex ${isUser ? 'justify-end' : 'justify-start'} items-start gap-1.5 w-full">
-              ${!isUser ? `
-                <img src="${char?.avatar || DEFAULT_FALLBACK_AVATAR}" alt="avatar" class="w-9 h-9 rounded-full object-cover bg-slate-800 border border-black/10 shrink-0 cursor-pointer" onclick="openLightbox('${char?.avatar || DEFAULT_FALLBACK_AVATAR}')" onerror="this.src='${DEFAULT_FALLBACK_AVATAR}'" />
-              ` : ''}
+    const variants = (!isUser && msg.variants && msg.variants.length) ? msg.variants : [msg.content];
+    const activeVariantIdx = (!isUser && typeof msg.activeVariantIndex === 'number')
+      ? Math.min(Math.max(msg.activeVariantIndex, 0), variants.length - 1)
+      : variants.length - 1;
+    const displayContent = isUser ? msg.content : variants[activeVariantIdx];
 
-              <div class="flex items-start gap-1.5 max-w-[78%]">
-                ${isUser ? `
-                  <div class="flex items-center gap-1 mr-1 mt-0.5">
-                    <div class="relative">
-                      <button onclick="toggleMessageMenu(${index})" title="더보기" class="p-1 rounded-lg text-slate-600 dark:text-zinc-400 hover:bg-black/10 dark:hover:bg-white/10 transition">
-                        <i data-lucide="more-vertical" class="w-3.5 h-3.5"></i>
-                      </button>
-                      <div id="menu-${index}" class="hidden absolute right-0 top-6 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-lg p-1 z-30 w-24 text-[11px] font-medium">
-                        <button onclick="editMessageInline(${index})" class="w-full text-left px-2 py-1.5 hover:bg-[var(--fill-muted)] rounded flex items-center gap-1 text-[var(--ink)]">
-                          <i data-lucide="edit-2" class="w-3 h-3"></i> 수정
-                        </button>
-                        <button onclick="deleteMessage(${index})" class="w-full text-left px-2 py-1.5 hover:bg-rose-500/15 rounded flex items-center gap-1 text-rose-500">
-                          <i data-lucide="trash-2" class="w-3 h-3"></i> 삭제
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ` : ''}
-
-                <div id="msg-bubble-${index}" class="flex flex-col ${isUser ? 'items-end' : 'items-start'} gap-1">
-                  ${msg.image ? `
-                    <img src="${msg.image}" alt="첨부 이미지" class="max-w-[180px] rounded-2xl cursor-pointer block shadow-sm" onclick="openLightbox('${msg.image}')" />
-                  ` : ''}
-                  ${msg.isEditing ? `
-                    <div class="relative px-3.5 py-2 rounded-2xl text-[13px] leading-relaxed break-words shadow-sm ${
-                      isUser
-                        ? 'bg-[#FEE500] text-slate-950 rounded-tr-none'
-                        : (isKakaoDark ? 'bg-[#2A2A2A] text-slate-100 border border-zinc-700/60 rounded-tl-none' : 'bg-white text-slate-950 rounded-tl-none')
-                    }">
-                      <div class="space-y-2 min-w-[200px]">
-                        <textarea id="edit-textarea-${index}" rows="2" class="w-full bg-white dark:bg-zinc-800 text-slate-900 dark:text-white text-xs p-2 rounded-lg border border-zinc-400 focus:outline-none resize-none">${escapeHtml(msg.content)}</textarea>
-                        <div class="flex justify-end gap-1">
-                          <button onclick="cancelEdit(${index})" class="px-2 py-1 text-[10px] bg-zinc-300 dark:bg-zinc-700 rounded text-zinc-800 dark:text-zinc-200 font-bold">취소</button>
-                          <button onclick="saveEditInline(${index})" class="px-2 py-1 text-[10px] bg-[var(--accent)] text-[var(--accent-text)] rounded font-bold">저장</button>
-                        </div>
-                      </div>
-                    </div>
-                  ` : (displayContent ? `
-                    <div class="relative px-3.5 py-2 rounded-2xl text-[13px] leading-relaxed break-words shadow-sm ${
-                      isUser
-                        ? 'bg-[#FEE500] text-slate-950 rounded-tr-none'
-                        : (isKakaoDark ? 'bg-[#2A2A2A] text-slate-100 border border-zinc-700/60 rounded-tl-none' : 'bg-white text-slate-950 rounded-tl-none')
-                    }">
-                      <div id="content-${index}">${escapeHtml(displayContent)}</div>
-                    </div>
-                  ` : '')}
+    // ========================================================
+    // 1. 유저 메시지 (기존 그대로 유지)
+    // ========================================================
+    if (isUser) {
+      return `
+        <div class="flex flex-col items-end gap-1 relative group w-full mb-2">
+          <div class="flex justify-end items-end gap-1 max-w-[88%] ml-auto">
+            <div class="flex items-center gap-0.5 shrink-0 select-none pb-0.5">
+              <div class="relative flex items-center">
+                <button onclick="toggleMessageMenu(${index})" title="더보기" class="w-5 h-5 flex items-center justify-center text-slate-500 hover:text-slate-700 dark:text-zinc-400 dark:hover:text-zinc-200 transition rounded hover:bg-black/5">
+                  <i data-lucide="more-vertical" class="w-3.5 h-3.5"></i>
+                </button>
+                <div id="menu-${index}" class="hidden absolute right-0 bottom-full mb-1 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-lg p-1 z-30 w-24 text-[11px] font-medium">
+                  <button onclick="editMessageInline(${index})" class="w-full text-left px-2 py-1.5 hover:bg-[var(--fill-muted)] rounded flex items-center gap-1 text-[var(--ink)]">
+                    <i data-lucide="edit-2" class="w-3 h-3"></i> 수정
+                  </button>
+                  <button onclick="deleteMessage(${index})" class="w-full text-left px-2 py-1.5 hover:bg-rose-500/15 rounded flex items-center gap-1 text-rose-500">
+                    <i data-lucide="trash-2" class="w-3 h-3"></i> 삭제
+                  </button>
                 </div>
-
-                ${!isUser ? `
-                  <div class="flex items-center gap-1 ml-1 mt-0.5">
-                    <div class="relative">
-                      <button onclick="toggleMessageMenu(${index})" title="더보기" class="p-1 rounded-lg text-slate-600 dark:text-zinc-400 hover:bg-black/10 dark:hover:bg-white/10 transition">
-                        <i data-lucide="more-vertical" class="w-3.5 h-3.5"></i>
-                      </button>
-                      <div id="menu-${index}" class="hidden absolute left-0 top-6 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-lg p-1 z-30 w-24 text-[11px] font-medium">
-                        <button onclick="editMessageInline(${index})" class="w-full text-left px-2 py-1.5 hover:bg-[var(--fill-muted)] rounded flex items-center gap-1 text-[var(--ink)]">
-                          <i data-lucide="edit-2" class="w-3 h-3"></i> 수정
-                        </button>
-                        <button onclick="deleteMessage(${index})" class="w-full text-left px-2 py-1.5 hover:bg-rose-500/15 rounded flex items-center gap-1 text-rose-500">
-                          <i data-lucide="trash-2" class="w-3 h-3"></i> 삭제
-                        </button>
-                        <button onclick="toggleBookmark(${index})" class="w-full text-left px-2 py-1.5 hover:bg-[var(--fill-muted)] rounded flex items-center gap-1 text-[var(--ink)]">
-                          <i data-lucide="star" class="w-3 h-3"></i> ${msg.bookmarked ? '북마크 취소' : '북마크'}
-                        </button>
-                      </div>
-                    </div>
-
-                    ${isLastAssistant ? `
-                      <button onclick="openRerollModal()" title="다시 생성 (리롤)" class="p-1 rounded-lg text-slate-600 dark:text-zinc-400 hover:bg-black/10 dark:hover:bg-white/10 transition">
-                        <i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i>
-                      </button>
-                    ` : ''}
-                  </div>
-                ` : ''}
               </div>
             </div>
 
-            ${!isUser && variants.length > 1 ? `
-              <div class="flex items-center gap-1 pl-11 mt-0.5 text-[10px] font-mono ${isKakaoDark ? 'text-zinc-500' : 'text-slate-500'}">
-                <button onclick="prevVariant(${index})" title="이전 응답" class="p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition">
-                  <i data-lucide="chevron-left" class="w-3 h-3"></i>
-                </button>
-                <span>${activeVariantIdx + 1}/${variants.length}</span>
-                <button onclick="nextVariant(${index})" title="다음 응답" class="p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition">
-                  <i data-lucide="chevron-right" class="w-3 h-3"></i>
-                </button>
-              </div>
-            ` : ''}
+            <div id="msg-bubble-${index}" class="flex flex-col items-end gap-1 min-w-0">
+              ${msg.image ? `
+                <img src="${msg.image}" alt="첨부 이미지" class="max-w-[180px] rounded-2xl cursor-pointer block shadow-sm" onclick="openLightbox('${msg.image}')" />
+              ` : ''}
+              ${msg.isEditing ? `
+                <div class="relative px-3.5 py-2 rounded-2xl text-[13.5px] leading-relaxed break-words shadow-sm bg-[#FEE500] text-slate-950 rounded-tr-none">
+                  <div class="space-y-2 min-w-[200px]">
+                    <textarea id="edit-textarea-${index}" rows="2" class="w-full bg-white dark:bg-zinc-800 text-slate-900 dark:text-white text-xs p-2 rounded-lg border border-zinc-400 focus:outline-none resize-none">${escapeHtml(msg.content)}</textarea>
+                    <div class="flex justify-end gap-1">
+                      <button onclick="cancelEdit(${index})" class="px-2 py-1 text-[10px] bg-zinc-300 dark:bg-zinc-700 rounded text-zinc-800 dark:text-zinc-200 font-bold">취소</button>
+                      <button onclick="saveEditInline(${index})" class="px-2 py-1 text-[10px] bg-[var(--accent)] text-[var(--accent-text)] rounded font-bold">저장</button>
+                    </div>
+                  </div>
+                </div>
+              ` : (displayContent ? `
+                <div class="relative px-3.5 py-2 rounded-2xl text-[13.5px] leading-relaxed break-words shadow-sm bg-[#FEE500] text-slate-950 rounded-tr-none">
+                  <div id="content-${index}">${escapeHtml(displayContent)}</div>
+                </div>
+              ` : '')}
+            </div>
           </div>
-        `;
-      }).join('');
-
-      scrollToBottom();
-      lucide.createIcons();
+        </div>
+      `;
     }
+
+    // ========================================================
+    // 2. AI 메시지 (버튼 2개 달린 쪽 길이에 맞춰 100% 동일하게 통일)
+    // ========================================================
+    const charAvatar = char?.avatar || DEFAULT_FALLBACK_AVATAR;
+    const charName = char?.name || 'AI';
+
+    return `
+      <div class="flex items-start gap-2.5 w-full group mb-2">
+        <img 
+          src="${charAvatar}" 
+          alt="avatar" 
+          class="w-10 h-10 rounded-[14px] object-cover bg-slate-800 border border-black/10 shrink-0 cursor-pointer mt-0.5 shadow-sm" 
+          onclick="openLightbox('${charAvatar}')" 
+          onerror="this.src='${DEFAULT_FALLBACK_AVATAR}'" 
+        />
+
+        <div class="flex flex-col items-start min-w-0 max-w-[calc(88%-2.5rem)]">
+          <span class="text-xs font-semibold ${isKakaoDark ? 'text-zinc-300' : 'text-slate-800'} mb-1 ml-0.5 truncate max-w-[200px]">
+            ${escapeHtml(charName)} ${msg.bookmarked ? '⭐' : ''}
+          </span>
+
+          <div class="flex items-end gap-1.5 max-w-full">
+            <div id="msg-bubble-${index}" class="flex flex-col items-start gap-1 min-w-0 max-w-[calc(100%-48px)]">
+              ${msg.image ? `
+                <img src="${msg.image}" alt="첨부 이미지" class="max-w-[220px] rounded-2xl cursor-pointer block shadow-sm" onclick="openLightbox('${msg.image}')" />
+              ` : ''}
+              ${msg.isEditing ? `
+                <div class="relative px-3.5 py-2.5 rounded-2xl text-[13.5px] leading-relaxed break-words shadow-sm ${
+                  isKakaoDark ? 'bg-[#2A2A2A] text-slate-100 border border-zinc-700/60 rounded-tl-none' : 'bg-white text-slate-950 rounded-tl-none'
+                }">
+                  <div class="space-y-2 min-w-[200px]">
+                    <textarea id="edit-textarea-${index}" rows="2" class="w-full bg-white dark:bg-zinc-800 text-slate-900 dark:text-white text-xs p-2 rounded-lg border border-zinc-400 focus:outline-none resize-none">${escapeHtml(msg.content)}</textarea>
+                    <div class="flex justify-end gap-1">
+                      <button onclick="cancelEdit(${index})" class="px-2 py-1 text-[10px] bg-zinc-300 dark:bg-zinc-700 rounded text-zinc-800 dark:text-zinc-200 font-bold">취소</button>
+                      <button onclick="saveEditInline(${index})" class="px-2 py-1 text-[10px] bg-[var(--accent)] text-[var(--accent-text)] rounded font-bold">저장</button>
+                    </div>
+                  </div>
+                </div>
+              ` : (displayContent ? `
+                <div class="relative px-3.5 py-2.5 rounded-2xl text-[13.5px] leading-relaxed break-words shadow-sm ${
+                  isKakaoDark ? 'bg-[#2A2A2A] text-slate-100 border border-zinc-700/60 rounded-tl-none' : 'bg-white text-slate-950 rounded-tl-none'
+                }">
+                  <div id="content-${index}">${escapeHtml(displayContent)}</div>
+                </div>
+              ` : '')}
+            </div>
+
+            <div class="flex items-center gap-0.5 shrink-0 select-none pb-0.5">
+              <div class="relative flex items-center">
+                <button onclick="toggleMessageMenu(${index})" title="더보기" class="w-5 h-5 flex items-center justify-center rounded text-slate-500 hover:text-slate-700 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-black/5 dark:hover:bg-white/5 transition">
+                  <i data-lucide="more-vertical" class="w-3.5 h-3.5"></i>
+                </button>
+                <div id="menu-${index}" class="hidden absolute left-0 bottom-full mb-1 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-lg p-1 z-30 w-24 text-[11px] font-medium">
+                  <button onclick="editMessageInline(${index})" class="w-full text-left px-2 py-1.5 hover:bg-[var(--fill-muted)] rounded flex items-center gap-1 text-[var(--ink)]">
+                    <i data-lucide="edit-2" class="w-3 h-3"></i> 수정
+                  </button>
+                  <button onclick="deleteMessage(${index})" class="w-full text-left px-2 py-1.5 hover:bg-rose-500/15 rounded flex items-center gap-1 text-rose-500">
+                    <i data-lucide="trash-2" class="w-3 h-3"></i> 삭제
+                  </button>
+                  <button onclick="toggleBookmark(${index})" class="w-full text-left px-2 py-1.5 hover:bg-[var(--fill-muted)] rounded flex items-center gap-1 text-[var(--ink)]">
+                    <i data-lucide="star" class="w-3 h-3"></i> ${msg.bookmarked ? '북마크 취소' : '북마크'}
+                  </button>
+                </div>
+              </div>
+
+              ${isLastAssistant ? `
+                <button onclick="openRerollModal()" title="다시 생성 (리롤)" class="w-5 h-5 flex items-center justify-center rounded text-slate-500 hover:text-slate-700 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-black/5 dark:hover:bg-white/5 transition">
+                  <i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i>
+                </button>
+              ` : ''}
+            </div>
+          </div>
+
+          ${(isLastAssistant && variants.length > 1) ? `
+            <div class="flex items-center gap-1 text-[11px] font-mono select-none ${isKakaoDark ? 'text-zinc-400' : 'text-slate-500'} mt-1 ml-auto mr-12">
+              <button onclick="prevVariant(${index})" title="이전 응답" class="hover:text-black dark:hover:text-white transition p-0.5">
+                <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
+              </button>
+              <span class="px-0.5">${activeVariantIdx + 1}/${variants.length}</span>
+              <button onclick="nextVariant(${index})" title="다음 응답" class="hover:text-black dark:hover:text-white transition p-0.5">
+                <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  scrollToBottom();
+  lucide.createIcons();
+}
 
     function toggleMessageMenu(index) {
       document.querySelectorAll('[id^="menu-"]').forEach(el => {
