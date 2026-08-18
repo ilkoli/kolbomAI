@@ -1,0 +1,55 @@
+ @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+
+ :root[data-theme="light"] {
+ --bg: #F2F2F2;
+ --card: #EAE4D5;
+ --border: #B6B09F;
+ --ink: #000000;
+ --muted: #6b665c;
+ --fill-muted: rgba(182, 176, 159, 0.28);
+ }
+ :root[data-theme="dark"] {
+ --bg: #1C1A17;
+ --card: #2A2620;
+ --border: #4A453D;
+ --ink: #F2F2F2;
+ --muted: #a39c8f;
+ --fill-muted: rgba(74, 69, 61, 0.6);
+ }
+
+ :root[data-accent="terracotta"] { --accent: #C1694F; --accent-text: #ffffff; }
+ :root[data-accent="forest"] { --accent: #4A5D45; --accent-text: #ffffff; }
+ :root[data-accent="maroon"] { --accent: #7B3F3F; --accent-text: #ffffff; }
+ :root[data-accent="mustard"] { --accent: #C9A227; --accent-text: #1C1A17; }
+ :root[data-accent="dustyrose"] { --accent: #C08A7D; --accent-text: #1C1A17; }
+ :root[data-accent="indigo"] { --accent: #3B4A6B; --accent-text: #ffffff; }
+ :root[data-accent="cognac"] { --accent: #9C6B3E; --accent-text: #ffffff; }
+ :root[data-accent="slate"] { --accent: #5C6B73; --accent-text: #ffffff; }
+
+ * {
+ font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+ -webkit-tap-highlight-color: transparent;
+ letter-spacing: -0.02em;
+ }
+ html, body {
+ height: 100%;
+ overscroll-behavior-y: none;
+ }
+ ::-webkit-scrollbar {
+ width: 4px;
+ height: 4px;
+ }
+ ::-webkit-scrollbar-track {
+ background: transparent;
+ }
+ ::-webkit-scrollbar-thumb {
+ background: #B6B09F;
+ border-radius: 9999px;
+ }
+ @keyframes bookmarkPulse {
+ 0%, 100% { box-shadow: 0 0 0 0 rgba(193, 105, 79, 0); }
+ 30% { box-shadow: 0 0 0 4px rgba(193, 105, 79, 0.55); }
+ }
+ .bookmark-highlight {
+ animation: bookmarkPulse 1.4s ease-out;
+ }
