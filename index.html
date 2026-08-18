@@ -39,7 +39,7 @@
  </button>
  </aside>
 
- <div class="flex-1 flex flex-col min-w-0">
+ <div class="flex-1 flex flex-col min-w-0 h-full min-h-0 overflow-hidden">
 
  <header id="global-header" class="sm:hidden sticky top-0 z-40 bg-[var(--bg)]/90 backdrop-blur-md border-b border-[var(--border)]/30 px-4 py-3.5 transition-colors duration-300">
  <div class="flex items-center justify-between">
@@ -60,7 +60,8 @@
  </div>
  </header>
 
- <main class="flex-1 flex flex-col h-full overflow-hidden pb-24 sm:pb-12" id="app-container">
+ <main class="flex-1 flex flex-col h-full overflow-y-auto min-h-0 pb-24 sm:pb-12" id="app-container">
+    
  <!-- (VIEW 1) 마이페이지 (대시보드) -->
  <div id="view-dashboard" class="p-4 sm:p-8 max-w-4xl mx-auto w-full space-y-6">
  <div class="pb-2 border-b border-[var(--border)]/30 flex justify-between items-end">
@@ -154,7 +155,7 @@
  </div>
 
  <!-- (VIEW 3) 새 캐릭터 등록 -->
- <div id="view-create" class="hidden p-4 sm:p-8 max-w-2xl mx-auto w-full space-y-6">
+ <div id="view-create" class="hidden p-4 sm:p-8 max-w-2xl mx-auto w-full space-y-6 pb-16">
  <div class="flex items-center justify-between pb-4 border-b border-[var(--border)]/30">
  <div>
  <h1 class="text-xl font-extrabold text-[var(--ink)]">새 캐릭터 등록</h1>
