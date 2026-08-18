@@ -3,6 +3,7 @@
  let currentPersonaAvatarBase64 = '';
  let currentFeedGridCols = 3;
  let pendingNavTarget = null;
+ let editingCharacterId = null; // 수정 중인 캐릭터 ID (신규 생성 시 null)
 
  const MODEL_PRICING = {
  'gpt-4o-mini': { inputPer1M: 0.15, outputPer1M: 0.60, provider: 'openai', name: 'OpenAI GPT-4o-mini' },
@@ -580,50 +581,86 @@
  }
  }
 
- function renderCharacterFeed() {
- const chars = JSON.parse(localStorage.getItem('crack_characters') || '[]');
- const query = (document.getElementById('char-search-input')?.value || '').toLowerCase();
- const grid = document.getElementById('characters-grid');
+ // 캐릭터 피드 렌더링 (그라데이션 완화 & 제목 호버 색상 수정)
+function renderCharacterFeed() {
+  const grid = document.getElementById('characters-grid') || document.getElementById('character-feed-grid');
+  const emptyState = document.getElementById('feed-empty');
+  if (!grid) return;
 
- const filtered = chars.filter(c => 
- c.name.toLowerCase().includes(query) || 
- (c.intro && c.intro.toLowerCase().includes(query))
- );
+  const chars = JSON.parse(localStorage.getItem('crack_characters') || '[]');
+  const searchInput = document.getElementById('char-search-input') || document.getElementById('feed-search-input') || document.getElementById('character-search-input');
+  const query = (searchInput ? searchInput.value : '').toLowerCase().trim();
 
- if (filtered.length === 0) {
- grid.innerHTML = `<div class="col-span-full py-16 text-center text-xs text-[var(--muted)]">일치하는 캐릭터가 없습니다.</div>`;
- return;
- }
+  const filtered = chars.filter(c => {
+    if (!c) return false;
+    const name = (c.name || '').toLowerCase();
+    const intro = (c.intro || c.tagline || c.systemPrompt || '').toLowerCase();
+    const author = (c.author || c.creator || '').toLowerCase();
+    return !query || name.includes(query) || intro.includes(query) || author.includes(query);
+  });
 
- grid.innerHTML = filtered.map(char => {
- const avatarSrc = char.avatar || DEFAULT_FALLBACK_AVATAR;
- return `
- <div class="relative flex flex-col bg-[var(--card)] border border-[var(--border)]/30 rounded-2xl sm:rounded-3xl overflow-hidden hover:border-[var(--accent)] transition group shadow-sm">
- 
- <button onclick="confirmDeleteCharacter(event, '${char.id}', '${escapeHtml(char.name)}')" title="캐릭터 삭제" class="absolute top-2.5 right-2.5 p-1.5 bg-black/40 hover:bg-black/70 backdrop-blur-md text-white rounded-full transition z-10">
- <i data-lucide="trash-2" class="w-3 h-3"></i>
- </button>
+  if (filtered.length === 0) {
+    grid.innerHTML = `
+      <div class="col-span-full py-16 text-center text-xs text-[var(--muted)]">
+        ${query ? '검색 결과가 없습니다.' : '등록된 캐릭터가 없습니다.'}
+      </div>
+    `;
+    if (emptyState) emptyState.classList.remove('hidden');
+    return;
+  }
 
- <div onclick="openCharacterDetailModal('${char.id}')" class="cursor-pointer flex-1 flex flex-col">
- <div class="w-full aspect-[2/3] bg-[var(--bg)] overflow-hidden relative" onclick="event.stopPropagation(); openLightbox('${avatarSrc}');">
- <img src="${avatarSrc}" alt="${char.name}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" onerror="this.src='${DEFAULT_FALLBACK_AVATAR}'" />
- <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
- <div class="absolute bottom-2.5 left-3 right-3 sm:bottom-3 sm:left-4 sm:right-4">
- <h3 class="font-bold text-xs sm:text-base text-white truncate drop-shadow-sm">${char.name}</h3>
- <p class="text-[10px] sm:text-xs text-zinc-100/90 line-clamp-2 leading-snug mt-1 drop-shadow-sm">${char.intro || '등록된 소개가 없습니다.'}</p>
- </div>
- </div>
+  if (emptyState) emptyState.classList.add('hidden');
 
- <div class="px-3 py-2 sm:px-4 sm:py-2.5 flex justify-between items-center text-[10px] sm:text-[11px]">
- <span class="text-[var(--muted)] flex items-center gap-1 font-medium"><i data-lucide="user" class="w-3 h-3 sm:w-3.5 sm:h-3.5"></i> ${escapeHtml(char.author || '주인님')}</span>
- <span class="text-[var(--accent)] font-bold group-hover:translate-x-0.5 transition">입장 →</span>
- </div>
- </div>
- </div>
- `;
- }).join('');
- lucide.createIcons();
- }
+  grid.innerHTML = filtered.map(c => {
+    const charId = escapeHtml(c.id);
+    const charName = escapeHtml(c.name || '이름 없음');
+    const charIntro = escapeHtml(c.intro || c.tagline || '소개가 없습니다.');
+    const authorName = escapeHtml(c.author || c.creator || '작성자 미상');
+    const avatarUrl = escapeHtml(c.avatar || DEFAULT_FALLBACK_AVATAR);
+    const isOfficial = c.isOfficial || authorName === '운영팀' || authorName === '관리자';
+
+    return `
+      <div onclick="openCharacterDetailModal('${charId}')" 
+           class="group relative flex flex-col rounded-2xl overflow-hidden bg-[var(--card)] border border-[var(--border)]/40 hover:border-[var(--accent)] hover:shadow-xl transition-all duration-300 cursor-pointer select-none">
+        
+        <div class="relative w-full aspect-[3/4] overflow-hidden bg-black/10">
+          <img src="${avatarUrl}" 
+               alt="${charName}" 
+               class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out pointer-events-none" 
+               onerror="this.src='${DEFAULT_FALLBACK_AVATAR}'" />
+          
+          <div class="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between pointer-events-none z-10">
+            <div>
+              ${isOfficial ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[var(--accent)] text-[var(--accent-text)] shadow-sm">공식</span>` : ''}
+            </div>
+            <button onclick="confirmDeleteCharacter(event, '${charId}', '${charName}')" 
+                    title="캐릭터 삭제" 
+                    class="p-1 rounded-lg bg-black/40 text-white/80 hover:text-rose-400 hover:bg-black/60 transition backdrop-blur-sm pointer-events-auto">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+
+          <div class="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent flex flex-col justify-end p-3.5 text-left pointer-events-none">
+            <h4 class="text-sm sm:text-base font-bold text-white leading-tight line-clamp-1 drop-shadow-sm">
+              ${charName}
+            </h4>
+            <p class="text-xs text-white/85 line-clamp-2 mt-1 leading-snug drop-shadow-sm">
+              ${charIntro}
+            </p>
+            <div class="flex items-center gap-1 mt-2 text-[11px] text-white/70 font-medium">
+              <span>@${authorName}</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    `;
+  }).join('');
+
+  if (window.lucide && typeof lucide.createIcons === 'function') {
+    lucide.createIcons();
+  }
+}
 
  function confirmDeleteCharacter(e, charId, charName) {
  e.stopPropagation();
@@ -2363,3 +2400,138 @@ function renderChatMessages() {
  const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
  return text.replace(/[&<>"']/g, m => map[m]);
  }
+
+ // 🔥 [1. 신규 캐릭터 생성 진입] - 모든 폼을 깨끗이 비우고 신규 모드로 전환
+function openCreateCharacterView() {
+  editingCharacterId = null;
+  currentUploadedAvatarBase64 = '';
+
+  // 1) 폼 필드 리셋
+  const form = document.getElementById('character-create-form');
+  if (form) form.reset();
+
+  // 2) 아바타 기본 이미지로 복원
+  const previewImg = document.getElementById('preview-img');
+  if (previewImg) previewImg.src = DEFAULT_FALLBACK_AVATAR;
+
+  // 3) 타이틀 및 버튼 텍스트를 '신규 등록' 모드로 설정
+  const titleEl = document.getElementById('create-view-title');
+  const descEl = document.getElementById('create-view-desc');
+  const submitBtnTop = document.getElementById('create-submit-btn-top');
+  const submitBtnBottom = document.getElementById('create-submit-btn-bottom');
+
+  if (titleEl) titleEl.innerText = '새 캐릭터 등록';
+  if (descEl) descEl.innerText = '새로운 페르소나와 세계관을 가진 AI 캐릭터를 만듭니다.';
+  if (submitBtnTop) submitBtnTop.innerText = '생성 완료';
+  if (submitBtnBottom) submitBtnBottom.innerText = '캐릭터 생성 및 등록 완료';
+
+  // 4) 시나리오 입력칸 기본 1개로 초기화
+  resetScenarioList();
+
+  // 5) 화면 이동
+  performNavigate('create');
+}
+
+// 🔥 [2. 캐릭터 수정 진입] - 상세 모달에서 선택한 캐릭터 데이터를 폼에 로드
+function openEditCharacterView() {
+  if (!selectedCharForDetailModal) return;
+  const char = selectedCharForDetailModal;
+  editingCharacterId = char.id;
+
+  // 1) 상세 정보 모달 닫기
+  closeCharacterDetailModal();
+
+  // 2) 기존 데이터 채우기
+  document.getElementById('create-name').value = char.name || '';
+  document.getElementById('create-intro').value = char.intro || '';
+  document.getElementById('create-author').value = char.author || '';
+  document.getElementById('create-version').value = char.version || '';
+  document.getElementById('create-description').value = char.description || '';
+  document.getElementById('create-prompt').value = char.systemPrompt || '';
+
+  // 3) 아바타 이미지 주입
+  currentUploadedAvatarBase64 = char.avatar || '';
+  document.getElementById('preview-img').src = char.avatar || DEFAULT_FALLBACK_AVATAR;
+
+  // 4) 시나리오 목록 복원
+  const scenarios = getCharScenarios(char);
+  resetScenarioList(scenarios);
+
+  // 5) 타이틀 및 버튼 텍스트를 '수정' 모드로 변경
+  const titleEl = document.getElementById('create-view-title');
+  const descEl = document.getElementById('create-view-desc');
+  const submitBtnTop = document.getElementById('create-submit-btn-top');
+  const submitBtnBottom = document.getElementById('create-submit-btn-bottom');
+
+  if (titleEl) titleEl.innerText = '캐릭터 정보 수정';
+  if (descEl) descEl.innerText = `'${char.name}'의 설정 및 프롬프트를 수정합니다.`;
+  if (submitBtnTop) submitBtnTop.innerText = '수정 완료';
+  if (submitBtnBottom) submitBtnBottom.innerText = '캐릭터 수정 완료';
+
+  // 6) 화면 이동
+  performNavigate('create');
+}
+
+// 🔥 [3. 생성/수정 통합 제출 핸들러]
+function handleCreateCharacter(e) {
+  e.preventDefault();
+  const name = document.getElementById('create-name').value.trim();
+  const intro = document.getElementById('create-intro').value.trim();
+  const author = document.getElementById('create-author').value.trim();
+  const version = document.getElementById('create-version').value.trim();
+  const description = document.getElementById('create-description').value.trim();
+  const systemPrompt = document.getElementById('create-prompt').value.trim();
+  const scenarios = collectScenariosFromForm();
+
+  let chars = JSON.parse(localStorage.getItem('crack_characters') || '[]');
+
+  if (editingCharacterId) {
+    // ─── [수정 모드] ───
+    const idx = chars.findIndex(c => c.id === editingCharacterId);
+    if (idx !== -1) {
+      const finalAvatar = currentUploadedAvatarBase64 || chars[idx].avatar || DEFAULT_FALLBACK_AVATAR;
+      chars[idx] = {
+        ...chars[idx],
+        name,
+        avatar: finalAvatar,
+        intro,
+        description,
+        systemPrompt,
+        startScenarios: scenarios,
+        author: author || localStorage.getItem('user_profile_nickname') || '주인님',
+        version: version || chars[idx].version || 'V1.0',
+        updatedAt: Date.now()
+      };
+      localStorage.setItem('crack_characters', JSON.stringify(chars));
+      alert(`"${name}" 캐릭터 정보가 성공적으로 수정되었습니다!`);
+    }
+  } else {
+    // ─── [신규 생성 모드] ───
+    const finalAvatar = currentUploadedAvatarBase64 || `https://api.dicebear.com/7.x/bottts/svg?seed=${Date.now()}`;
+    const newChar = {
+      id: `char-${Date.now()}`,
+      name,
+      avatar: finalAvatar,
+      intro,
+      description,
+      systemPrompt,
+      startScenarios: scenarios,
+      author: author || localStorage.getItem('user_profile_nickname') || '주인님',
+      version: version || 'V1.0',
+      createdAt: Date.now()
+    };
+    chars.unshift(newChar);
+    localStorage.setItem('crack_characters', JSON.stringify(chars));
+    alert(`"${name}" 캐릭터가 성공적으로 등록되었습니다!`);
+  }
+
+  // 폼 리셋 및 피드 갱신 후 이동
+  editingCharacterId = null;
+  currentUploadedAvatarBase64 = '';
+  document.getElementById('preview-img').src = DEFAULT_FALLBACK_AVATAR;
+  resetScenarioList();
+  e.target.reset();
+
+  renderCharacterFeed();
+  navigate('characters');
+}
