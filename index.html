@@ -10,10 +10,10 @@
  <script src="https://unpkg.com/lucide@latest"></script>
  <link rel="stylesheet" href="css/style.css" />
 </head>
-<body class="bg-[var(--bg)] text-[var(--ink)] min-h-screen flex flex-col antialiased transition-colors duration-300 selection:bg-[var(--border)] selection:text-[var(--ink)]">
+<body class="bg-[var(--bg)] text-[var(--ink)] h-screen overflow-hidden flex flex-col antialiased transition-colors duration-300 selection:bg-[var(--border)] selection:text-[var(--ink)]">
 
- <div class="flex flex-1 min-h-screen">
-
+  <div class="flex flex-1 h-full overflow-hidden">
+    
  <aside id="app-sidebar" class="hidden sm:flex flex-col items-center w-16 shrink-0 bg-[var(--card)] border-r border-[var(--border)] py-4 gap-3">
  <button onclick="navigate('dashboard')" class="w-8 h-8 rounded-lg bg-[var(--accent)] text-[var(--accent-text)] flex items-center justify-center font-black text-sm tracking-wider mb-2" title="콜봄 AI">
  K
@@ -60,8 +60,7 @@
  </div>
  </header>
 
- <main class="flex-1 flex flex-col pb-24 sm:pb-12" id="app-container">
-
+ <main class="flex-1 flex flex-col h-full overflow-hidden pb-24 sm:pb-12" id="app-container">
  <!-- (VIEW 1) 마이페이지 (대시보드) -->
  <div id="view-dashboard" class="p-4 sm:p-8 max-w-4xl mx-auto w-full space-y-6">
  <div class="pb-2 border-b border-[var(--border)]/30 flex justify-between items-end">
@@ -330,10 +329,9 @@
  </div>
 
  <!-- (VIEW 6) 1:1 카카오톡 UI 채팅방 -->
- <div id="view-chatroom" class="hidden fixed inset-0 z-50 flex justify-center items-center bg-black/70 backdrop-blur-sm sm:static sm:z-auto sm:bg-transparent sm:flex-1 sm:h-screen sm:py-4 overflow-hidden">
- <div id="kakao-container" class="w-full h-full sm:max-w-md sm:h-full sm:rounded-3xl flex flex-col bg-[#A0C0D6] shadow-2xl relative overflow-hidden transition-colors duration-200">
+<div id="view-chatroom" class="hidden fixed inset-0 z-50 flex justify-center items-center bg-black/70 backdrop-blur-sm sm:static sm:z-auto sm:bg-transparent sm:flex-1 sm:h-full sm:py-4 overflow-hidden">
+ <div id="kakao-container" class="w-full h-full sm:max-w-md sm:h-[calc(100vh-2rem)] sm:rounded-3xl flex flex-col bg-[#A0C0D6] shadow-2xl relative overflow-hidden transition-colors duration-200">
  
- <!-- 카톡 상단 고정 헤더 -->
  <div id="kakao-header" class="flex items-center justify-between px-3.5 py-2.5 border-b border-black/5 bg-[#A0C0D6] select-none z-20 shrink-0 transition-colors duration-200">
  <div class="flex items-center gap-2 overflow-hidden flex-1 min-w-0 pr-2">
  <button onclick="navigate('chats')" class="p-1.5 hover:bg-black/10 rounded-lg transition text-slate-800 shrink-0" id="kakao-back-btn">
@@ -355,7 +353,6 @@
  </div>
  </div>
 
- <!-- 북마크 모아보기 패널 -->
  <div id="bookmark-panel" class="hidden absolute inset-0 z-40 flex flex-col bg-[var(--bg)]">
  <div class="flex items-center justify-between px-3.5 py-2.5 border-b border-[var(--border)] shrink-0">
  <div class="flex items-center gap-1">
@@ -372,7 +369,6 @@
  <div id="bookmark-list" class="flex-1 overflow-y-auto p-3 space-y-2"></div>
  </div>
 
- <!-- 리롤 지시사항 입력 모달 -->
  <div id="reroll-modal" class="hidden absolute inset-0 z-30 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
  <div class="bg-[var(--bg)] border border-[var(--border)] rounded-2xl p-4 w-full max-w-xs space-y-3 shadow-2xl">
  <h3 class="font-bold text-sm text-[var(--ink)] flex items-center gap-1.5">
@@ -387,7 +383,6 @@
  </div>
  </div>
 
- <!-- 기억(요약) 관리 패널 -->
  <div id="memory-panel" class="hidden absolute inset-0 z-40 flex flex-col bg-[var(--bg)]">
  <div class="flex items-center justify-between px-3.5 py-2.5 border-b border-[var(--border)] shrink-0">
  <div class="flex items-center gap-1">
@@ -415,7 +410,6 @@
  </div>
  </div>
 
- <!-- 채팅방 햄버거 메뉴 -->
  <div id="room-menu-panel" class="hidden absolute inset-0 z-30 flex flex-col bg-[var(--bg)]">
  <div class="flex items-center justify-between px-3.5 py-2.5 border-b border-[var(--border)] shrink-0">
  <h3 class="font-bold text-sm text-[var(--ink)]">채팅방 메뉴</h3>
@@ -425,7 +419,6 @@
  </div>
 
  <div class="flex-1 overflow-y-auto p-4 space-y-5">
-
  <div class="flex items-center gap-3">
  <img id="room-menu-avatar" src="" alt="캐릭터" class="w-11 h-11 rounded-full object-cover border border-[var(--border)] shrink-0" />
  <div class="min-w-0">
@@ -484,10 +477,8 @@
  </div>
  </div>
 
- <!-- 카톡 메시지 스크롤 영역 -->
- <div id="kakao-messages" class="flex-1 overflow-y-auto p-4 space-y-3.5 text-sm overscroll-y-contain"></div>
+ <div id="kakao-messages" class="flex-1 overflow-y-auto min-h-0 p-4 space-y-3.5 text-sm overscroll-y-contain"></div>
 
- <!-- 카톡 하단 고정 입력 바 -->
  <div id="kakao-input-bar" class="p-2.5 bg-white border-t border-slate-200 shrink-0 z-20 transition-colors duration-200">
  <div id="chat-image-preview" class="hidden items-center gap-2 mb-2 px-1">
  <div class="relative">
