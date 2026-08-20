@@ -59,17 +59,28 @@
  let pendingImageMeta = null;
 
  window.addEventListener('DOMContentLoaded', () => {
- initStorage();
- applyThemeSettings();
- initVisualViewportHandler();
- updateDashboardStats();
- renderCharacterFeed();
- renderPersonaList();
- renderActiveChatsList();
- checkCharacterDraft();
- resetScenarioList();
- lucide.createIcons();
- });
+  initStorage();
+  applyThemeSettings();
+  initVisualViewportHandler();
+
+  // 초기 URL 해시 파싱 및 히스토리 초기 세팅
+  const initialHash = window.location.hash.replace('#', '') || 'dashboard';
+  const [viewPart, queryPart] = initialHash.split('?');
+  const params = {};
+  if (queryPart) {
+    const urlParams = new URLSearchParams(queryPart);
+    if (urlParams.get('session')) params.sessionId = urlParams.get('session');
+  }
+
+  history.replaceState({ viewName: viewPart || 'dashboard', params }, '', window.location.hash || '#dashboard');
+  routeFromURL(false);
+
+  checkCharacterDraft();
+  resetScenarioList();
+  if (window.lucide && typeof lucide.createIcons === 'function') {
+    lucide.createIcons();
+  }
+});
 
  function initVisualViewportHandler() {
  if (window.visualViewport) {
@@ -217,110 +228,132 @@
  }
  }
 
- function navigate(viewName, params = {}) {
- if (currentView === 'create' && viewName !== 'create' && hasUnsavedCharacterFormContent()) {
- pendingNavTarget = { viewName, params };
- openUnsavedChangesModal();
- return;
- }
- performNavigate(viewName, params);
- }
+ // 🔥 [수정] 네비게이션 진입 함수 (히스토리 기록 push 여부 플래그 추가)
+function navigate(viewName, params = {}, pushHistory = true) {
+  if (currentView === 'create' && viewName !== 'create' && hasUnsavedCharacterFormContent()) {
+    pendingNavTarget = { viewName, params, pushHistory };
+    openUnsavedChangesModal();
+    return;
+  }
+  performNavigate(viewName, params, pushHistory);
+}
 
- function hasUnsavedCharacterFormContent() {
- const ids = ['create-name', 'create-intro', 'create-author', 'create-version', 'create-description', 'create-prompt'];
- const hasFieldContent = ids.some(id => (document.getElementById(id)?.value || '').trim().length > 0);
- const hasScenarioContent = collectScenariosFromForm().some(sc => sc.title || sc.greeting || sc.startContext);
- return hasFieldContent || hasScenarioContent || !!currentUploadedAvatarBase64;
- }
+// 🔥 [수정] 실제 화면 전환 및 URL/히스토리 갱신
+function performNavigate(viewName, params = {}, pushHistory = true) {
+  // 열려있는 모달 닫기
+  closeCharacterDetailModal();
+  closeCharacterSessionModal();
+  closePersonaModal();
+  closeRenameSessionModal();
+  closeCreateFolderModal();
+  closeMoveFolderModal();
+  closeApiModelModal();
+  closeNicknameModal();
+  closeThemeModal();
+  closeDraftListModal();
+  closeLightbox();
 
- function openUnsavedChangesModal() {
- document.getElementById('unsaved-changes-modal').classList.remove('hidden');
- lucide.createIcons();
- }
+  currentView = viewName;
+  const views = ['dashboard', 'characters', 'create', 'personas', 'chats', 'chatroom'];
+  views.forEach(v => {
+    const el = document.getElementById(`view-${v}`);
+    if (el) el.classList.add('hidden');
+  });
 
- function closeUnsavedChangesModal() {
- document.getElementById('unsaved-changes-modal').classList.add('hidden');
- pendingNavTarget = null;
- }
+  const targetEl = document.getElementById(`view-${viewName}`);
+  if (targetEl) targetEl.classList.remove('hidden');
 
- function confirmSaveAndLeave() {
- saveCharacterDraft(true);
- const target = pendingNavTarget;
- document.getElementById('unsaved-changes-modal').classList.add('hidden');
- pendingNavTarget = null;
- if (target) performNavigate(target.viewName, target.params);
- }
+  const mBottomNav = document.getElementById('mobile-bottom-nav');
+  const globalHeader = document.getElementById('global-header');
 
- function confirmDiscardAndLeave() {
- const target = pendingNavTarget;
- document.getElementById('unsaved-changes-modal').classList.add('hidden');
- pendingNavTarget = null;
- if (target) performNavigate(target.viewName, target.params);
- }
+  if (viewName === 'chatroom') {
+    if (mBottomNav) mBottomNav.classList.add('hidden');
+    if (window.innerWidth < 640) {
+      if (globalHeader) globalHeader.classList.add('hidden');
+      const chatroomEl = document.getElementById('view-chatroom');
+      if (chatroomEl && window.visualViewport) {
+        chatroomEl.style.height = `${window.visualViewport.height}px`;
+      }
+    }
+  } else {
+    if (mBottomNav) mBottomNav.classList.remove('hidden');
+    if (globalHeader) globalHeader.classList.remove('hidden');
+    const chatroomEl = document.getElementById('view-chatroom');
+    if (chatroomEl) chatroomEl.style.height = '';
+  }
 
- function performNavigate(viewName, params = {}) {
- currentView = viewName;
- const views = ['dashboard', 'characters', 'create', 'personas', 'chats', 'chatroom'];
- views.forEach(v => {
- const el = document.getElementById(`view-${v}`);
- if (el) el.classList.add('hidden');
- });
+  // 데스크톱 사이드바 활성 상태 동기화
+  ['dashboard', 'characters', 'personas', 'chats'].forEach(tab => {
+    const btn = document.getElementById(`sidebar-btn-${tab}`);
+    if (btn) {
+      if (tab === viewName) {
+        btn.className = 'w-9 h-9 rounded-xl flex items-center justify-center transition bg-[var(--accent)] text-[var(--accent-text)]';
+      } else {
+        btn.className = 'w-9 h-9 rounded-xl flex items-center justify-center transition text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--fill-muted)]';
+      }
+    }
+  });
 
- const targetEl = document.getElementById(`view-${viewName}`);
- if (targetEl) targetEl.classList.remove('hidden');
+  // 모바일 하단바 활성 상태 동기화
+  ['dashboard', 'characters', 'personas', 'chats'].forEach(tab => {
+    const mBtn = document.getElementById(`m-nav-${tab}`);
+    if (mBtn) {
+      if (tab === viewName) {
+        mBtn.className = 'flex flex-col items-center gap-1 py-1 px-3 rounded-xl text-[var(--accent)] font-bold transition';
+      } else {
+        mBtn.className = 'flex flex-col items-center gap-1 py-1 px-3 rounded-xl text-[var(--muted)] hover:text-[var(--ink)] transition';
+      }
+    }
+  });
 
- const mBottomNav = document.getElementById('mobile-bottom-nav');
- const globalHeader = document.getElementById('global-header');
- 
- if (viewName === 'chatroom') {
- mBottomNav.classList.add('hidden');
- if (window.innerWidth < 640) {
- globalHeader.classList.add('hidden');
- const chatroomEl = document.getElementById('view-chatroom');
- if (window.visualViewport) {
- chatroomEl.style.height = `${window.visualViewport.height}px`;
- }
- }
- } else {
- mBottomNav.classList.remove('hidden');
- globalHeader.classList.remove('hidden');
- const chatroomEl = document.getElementById('view-chatroom');
- if (chatroomEl) chatroomEl.style.height = '';
- }
+  // 뷰별 데이터 갱신
+  if (viewName === 'dashboard') updateDashboardStats();
+  if (viewName === 'characters') renderCharacterFeed();
+  if (viewName === 'create') checkCharacterDraft();
+  if (viewName === 'personas') renderPersonaList();
+  if (viewName === 'chats') renderActiveChatsList();
+  if (viewName === 'chatroom' && params.sessionId) {
+    openChatRoom(params.sessionId);
+  }
 
- ['dashboard', 'characters', 'personas', 'chats'].forEach(tab => {
- const btn = document.getElementById(`sidebar-btn-${tab}`);
- if (btn) {
- if (tab === viewName) {
- btn.className = 'w-9 h-9 rounded-xl flex items-center justify-center transition bg-[var(--accent)] text-[var(--accent-text)]';
- } else {
- btn.className = 'w-9 h-9 rounded-xl flex items-center justify-center transition text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--fill-muted)]';
- }
- }
- });
+  // 🔥 브라우저 히스토리 스택 추가 및 해시(#) URL 업데이트
+  if (pushHistory) {
+    const hash = (viewName === 'chatroom' && params.sessionId)
+      ? `#chatroom?session=${params.sessionId}`
+      : `#${viewName}`;
+    history.pushState({ viewName, params }, '', hash);
+  }
 
- ['dashboard', 'characters', 'personas', 'chats'].forEach(tab => {
- const mBtn = document.getElementById(`m-nav-${tab}`);
- if (mBtn) {
- if (tab === viewName) {
- mBtn.className = 'flex flex-col items-center gap-1 py-1 px-3 rounded-xl text-[var(--accent)] font-bold transition';
- } else {
- mBtn.className = 'flex flex-col items-center gap-1 py-1 px-3 rounded-xl text-[var(--muted)] hover:text-[var(--ink)] transition';
- }
- }
- });
+  window.scrollTo(0, 0);
+  if (window.lucide && typeof lucide.createIcons === 'function') {
+    lucide.createIcons();
+  }
+}
 
- if (viewName === 'dashboard') updateDashboardStats();
- if (viewName === 'characters') renderCharacterFeed();
- if (viewName === 'create') checkCharacterDraft();
- if (viewName === 'personas') renderPersonaList();
- if (viewName === 'chats') renderActiveChatsList();
- if (viewName === 'chatroom' && params.sessionId) {
- openChatRoom(params.sessionId);
- }
+// 🔥 [추가] 브라우저 뒤로가기 / 앞으로가기 감지
+window.addEventListener('popstate', (e) => {
+  if (e.state && e.state.viewName) {
+    performNavigate(e.state.viewName, e.state.params || {}, false);
+  } else {
+    routeFromURL(false);
+  }
+});
 
- window.scrollTo(0, 0);
- lucide.createIcons();
+// 🔥 [추가] URL 해시 기반 자동 라우터
+function routeFromURL(pushHistory = false) {
+  const hash = window.location.hash.replace('#', '') || 'dashboard';
+  const [viewPart, queryPart] = hash.split('?');
+  const params = {};
+  if (queryPart) {
+    const urlParams = new URLSearchParams(queryPart);
+    if (urlParams.get('session')) {
+      params.sessionId = urlParams.get('session');
+    }
+  }
+
+  const validViews = ['dashboard', 'characters', 'create', 'personas', 'chats', 'chatroom'];
+  const viewName = validViews.includes(viewPart) ? viewPart : 'dashboard';
+  performNavigate(viewName, params, pushHistory);
  }
 
  function updateDashboardStats() {
@@ -2429,7 +2462,7 @@ function openCreateCharacterView() {
   resetScenarioList();
 
   // 5) 화면 이동
-  performNavigate('create');
+  navigate('create');
 }
 
 // 🔥 [2. 캐릭터 수정 진입] - 상세 모달에서 선택한 캐릭터 데이터를 폼에 로드
@@ -2469,7 +2502,7 @@ function openEditCharacterView() {
   if (submitBtnBottom) submitBtnBottom.innerText = '캐릭터 수정 완료';
 
   // 6) 화면 이동
-  performNavigate('create');
+  navigate('create');
 }
 
 // 🔥 [3. 생성/수정 통합 제출 핸들러]
