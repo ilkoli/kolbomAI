@@ -228,7 +228,65 @@
  }
  }
 
- // 🔥 [수정] 네비게이션 진입 함수 (히스토리 기록 push 여부 플래그 추가)
+ // 🔥 [수정] 캐릭터 폼에 작성 중인 내용이 있는지 검사
+function hasUnsavedCharacterFormContent() {
+  const name = document.getElementById('create-name')?.value?.trim() || '';
+  const intro = document.getElementById('create-intro')?.value?.trim() || '';
+  const desc = document.getElementById('create-description')?.value?.trim() || '';
+  const prompt = document.getElementById('create-prompt')?.value?.trim() || '';
+  return !!(name || intro || desc || prompt || currentUploadedAvatarBase64);
+}
+
+// 🔥 [추가] 이탈 확인 모달 열기 / 닫기
+function openUnsavedChangesModal() {
+  const modal = document.getElementById('unsaved-changes-modal');
+  if (modal) modal.classList.remove('hidden');
+  if (window.lucide && typeof lucide.createIcons === 'function') {
+    lucide.createIcons();
+  }
+}
+
+function closeUnsavedChangesModal() {
+  const modal = document.getElementById('unsaved-changes-modal');
+  if (modal) modal.classList.add('hidden');
+  pendingNavTarget = null;
+}
+
+// 🔥 [추가] 임시저장 후 나가기
+function confirmSaveAndLeave() {
+  saveCharacterDraft(true);
+  const target = pendingNavTarget;
+  closeUnsavedChangesModal();
+  if (target) {
+    performNavigate(target.viewName, target.params, target.pushHistory);
+  }
+}
+
+// 🔥 [추가] 저장 안 하고 폼 초기화 후 나가기
+function confirmDiscardAndLeave() {
+  const target = pendingNavTarget;
+  closeUnsavedChangesModal();
+
+  // 폼 및 임시 데이터 리셋
+  const form = document.getElementById('character-create-form');
+  if (form) form.reset();
+  currentUploadedAvatarBase64 = '';
+  const previewImg = document.getElementById('preview-img');
+  if (previewImg) previewImg.src = DEFAULT_FALLBACK_AVATAR;
+  resetScenarioList();
+  editingCharacterId = null;
+
+  if (target) {
+    performNavigate(target.viewName, target.params, target.pushHistory);
+  }
+}
+
+// 🔥 [추가] 아바타 파일 인풋 바인딩
+function handleAvatarUpload(e) {
+  handleImageUpload(e, 'character');
+}
+
+// 🔥 [수정] 네비게이션 진입 함수
 function navigate(viewName, params = {}, pushHistory = true) {
   if (currentView === 'create' && viewName !== 'create' && hasUnsavedCharacterFormContent()) {
     pendingNavTarget = { viewName, params, pushHistory };
@@ -1533,15 +1591,15 @@ function renderChatMessages() {
     const activeVariantIdx = (!isUser && typeof msg.activeVariantIndex === 'number')
       ? Math.min(Math.max(msg.activeVariantIndex, 0), variants.length - 1)
       : variants.length - 1;
-    const displayContent = isUser ? msg.content : variants[activeVariantIdx];
+    const displayContent = isUser ? (msg.content || '') : (variants[activeVariantIdx] || '');
 
     // ========================================================
-    // 1. 유저 메시지 (기존 그대로 유지)
+    // 1. 유저 메시지
     // ========================================================
     if (isUser) {
       return `
         <div class="flex flex-col items-end gap-1 relative group w-full mb-2">
-          <div class="flex justify-end items-end gap-1 max-w-[88%] ml-auto">
+          <div class="flex justify-end items-end gap-1 max-w-[85%] ml-auto">
             <div class="flex items-center gap-0.5 shrink-0 select-none pb-0.5">
               <div class="relative flex items-center">
                 <button onclick="toggleMessageMenu(${index})" title="더보기" class="w-5 h-5 flex items-center justify-center text-slate-500 hover:text-slate-700 dark:text-zinc-400 dark:hover:text-zinc-200 transition rounded hover:bg-black/5">
@@ -1558,12 +1616,10 @@ function renderChatMessages() {
               </div>
             </div>
 
-            <div id="msg-bubble-${index}" class="flex flex-col items-end gap-1 min-w-0">
-              ${msg.image ? `
-                <img src="${msg.image}" alt="첨부 이미지" class="max-w-[180px] rounded-2xl cursor-pointer block shadow-sm" onclick="openLightbox('${msg.image}')" />
-              ` : ''}
+            <div id="msg-bubble-${index}" class="flex flex-col items-end gap-1 max-w-full">
+              ${msg.image ? `<img src="${msg.image}" alt="첨부 이미지" class="max-w-[180px] rounded-2xl cursor-pointer block shadow-sm" onclick="openLightbox('${msg.image}')" />` : ''}
               ${msg.isEditing ? `
-                <div class="relative px-3.5 py-2 rounded-2xl text-[13.5px] leading-relaxed break-words shadow-sm bg-[#FEE500] text-slate-950 rounded-tr-none">
+                <div class="relative px-3.5 py-2 rounded-2xl text-[13.5px] leading-snug break-words shadow-sm bg-[#FEE500] text-slate-950 rounded-tr-none">
                   <div class="space-y-2 min-w-[200px]">
                     <textarea id="edit-textarea-${index}" rows="2" class="w-full bg-white dark:bg-zinc-800 text-slate-900 dark:text-white text-xs p-2 rounded-lg border border-zinc-400 focus:outline-none resize-none">${escapeHtml(msg.content)}</textarea>
                     <div class="flex justify-end gap-1">
@@ -1572,11 +1628,7 @@ function renderChatMessages() {
                     </div>
                   </div>
                 </div>
-              ` : (displayContent ? `
-                <div class="relative px-3.5 py-2 rounded-2xl text-[13.5px] leading-relaxed break-words shadow-sm bg-[#FEE500] text-slate-950 rounded-tr-none">
-                  <div id="content-${index}">${escapeHtml(displayContent)}</div>
-                </div>
-              ` : '')}
+              ` : (displayContent ? `<div class="relative px-3.5 py-2 rounded-2xl text-[13.5px] leading-snug shadow-sm bg-[#FEE500] text-slate-950 rounded-tr-none max-w-full break-words whitespace-pre-wrap inline-block text-left"><div id="content-${index}">${escapeHtml(displayContent.trim())}</div></div>` : '')}
             </div>
           </div>
         </div>
@@ -1584,7 +1636,7 @@ function renderChatMessages() {
     }
 
     // ========================================================
-    // 2. AI 메시지 (버튼 2개 달린 쪽 길이에 맞춰 100% 동일하게 통일)
+    // 2. AI 메시지
     // ========================================================
     const charAvatar = char?.avatar || DEFAULT_FALLBACK_AVATAR;
     const charName = char?.name || 'AI';
@@ -1599,18 +1651,16 @@ function renderChatMessages() {
           onerror="this.src='${DEFAULT_FALLBACK_AVATAR}'" 
         />
 
-        <div class="flex flex-col items-start min-w-0 max-w-[calc(88%-2.5rem)]">
+        <div class="flex flex-col items-start min-w-0 max-w-[82%]">
           <span class="text-xs font-semibold ${isKakaoDark ? 'text-zinc-300' : 'text-slate-800'} mb-1 ml-0.5 truncate max-w-[200px]">
             ${escapeHtml(charName)} ${msg.bookmarked ? '⭐' : ''}
           </span>
 
           <div class="flex items-end gap-1.5 max-w-full">
-            <div id="msg-bubble-${index}" class="flex flex-col items-start gap-1 min-w-0 max-w-[calc(100%-48px)]">
-              ${msg.image ? `
-                <img src="${msg.image}" alt="첨부 이미지" class="max-w-[220px] rounded-2xl cursor-pointer block shadow-sm" onclick="openLightbox('${msg.image}')" />
-              ` : ''}
+            <div id="msg-bubble-${index}" class="flex flex-col items-start gap-1 max-w-full">
+              ${msg.image ? `<img src="${msg.image}" alt="첨부 이미지" class="max-w-[220px] rounded-2xl cursor-pointer block shadow-sm mb-1" onclick="openLightbox('${msg.image}')" />` : ''}
               ${msg.isEditing ? `
-                <div class="relative px-3.5 py-2.5 rounded-2xl text-[13.5px] leading-relaxed break-words shadow-sm ${
+                <div class="relative px-3.5 py-2 rounded-2xl text-[13.5px] leading-snug shadow-sm ${
                   isKakaoDark ? 'bg-[#2A2A2A] text-slate-100 border border-zinc-700/60 rounded-tl-none' : 'bg-white text-slate-950 rounded-tl-none'
                 }">
                   <div class="space-y-2 min-w-[200px]">
@@ -1621,13 +1671,9 @@ function renderChatMessages() {
                     </div>
                   </div>
                 </div>
-              ` : (displayContent ? `
-                <div class="relative px-3.5 py-2.5 rounded-2xl text-[13.5px] leading-relaxed break-words shadow-sm ${
-                  isKakaoDark ? 'bg-[#2A2A2A] text-slate-100 border border-zinc-700/60 rounded-tl-none' : 'bg-white text-slate-950 rounded-tl-none'
-                }">
-                  <div id="content-${index}">${escapeHtml(displayContent)}</div>
-                </div>
-              ` : '')}
+              ` : (displayContent ? `<div class="relative px-3.5 py-2 rounded-2xl text-[13.5px] leading-snug shadow-sm max-w-full break-words whitespace-pre-wrap inline-block text-left ${
+                isKakaoDark ? 'bg-[#2A2A2A] text-slate-100 border border-zinc-700/60 rounded-tl-none' : 'bg-white text-slate-950 rounded-tl-none'
+              }"><div id="content-${index}">${escapeHtml(displayContent.trim())}</div></div>` : '')}
             </div>
 
             <div class="flex items-center gap-0.5 shrink-0 select-none pb-0.5">
@@ -1657,7 +1703,7 @@ function renderChatMessages() {
           </div>
 
           ${(isLastAssistant && variants.length > 1) ? `
-            <div class="flex items-center gap-1 text-[11px] font-mono select-none ${isKakaoDark ? 'text-zinc-400' : 'text-slate-500'} mt-1 ml-auto mr-12">
+            <div class="flex items-center gap-1 text-[11px] font-mono select-none ${isKakaoDark ? 'text-zinc-400' : 'text-slate-500'} mt-1 ml-1">
               <button onclick="prevVariant(${index})" title="이전 응답" class="hover:text-black dark:hover:text-white transition p-0.5">
                 <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
               </button>
