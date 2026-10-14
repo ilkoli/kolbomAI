@@ -39,10 +39,12 @@ async function handleAuthSubmit(e) {
     if (error) return alert('가입 실패: ' + error.message);
     alert('회원가입 완료! 자동으로 로그인됩니다.');
     closeAuthModal();
+    navigate('dashboard'); // 👈 [선택] 회원가입 즉시 대시보드로 이동
   } else {
     const { data, error } = await sb.auth.signInWithPassword({ email, password });
     if (error) return alert('로그인 실패: ' + error.message);
     closeAuthModal();
+    navigate('dashboard'); // 👈 [추가] 로그인 성공 시 대시보드(마이페이지)로 바로 이동
   }
 }
 
