@@ -121,22 +121,35 @@ async function syncCharacterToDB(character) {
   });
 }
 
-// 세션 상태 감지 리스너
+// 세션 상태 감지 리스너 (로그인 여부에 따라 화면 제어)
 if (sb) {
   sb.auth.onAuthStateChange(async (event, session) => {
     currentUser = session?.user || null;
     const loginBtn = document.getElementById('btn-open-login');
     const loggedInBox = document.getElementById('logged-in-box');
     const emailBadge = document.getElementById('user-email-badge');
+    const closeBtn = document.getElementById('auth-close-btn');
 
     if (currentUser) {
+      // ✅ 1. 로그인 성공: 모달 닫고 화면 정상 표시
+      closeAuthModal();
+      if (closeBtn) closeBtn.classList.remove('hidden');
       loginBtn?.classList.add('hidden');
       loggedInBox?.classList.remove('hidden');
       if (emailBadge) emailBadge.innerText = currentUser.email;
+
+      // 클라우드 데이터 가져온 뒤 현재 URL에 맞는 화면 띄우기
       await syncDownFromSupabase();
+      routeFromURL(false);
     } else {
+      // 🔒 2. 미로그인 상태: 모든 화면 뷰를 숨기고 로그인 모달만 강제 오픈
+      ['dashboard', 'characters', 'create', 'personas', 'chats', 'chatroom'].forEach(v => {
+        document.getElementById(`view-${v}`)?.classList.add('hidden');
+      });
+      if (closeBtn) closeBtn.classList.add('hidden');
       loginBtn?.classList.remove('hidden');
       loggedInBox?.classList.add('hidden');
+      openAuthModal();
     }
   });
 }
