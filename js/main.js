@@ -1,4 +1,145 @@
- const DEFAULT_FALLBACK_AVATAR = 'https://api.dicebear.com/7.x/bottts/svg?seed=kolbom_default';
+// ========================================================
+// [Supabase] 클라이언트 초기화 및 인증
+// ========================================================
+const SUPABASE_URL = 'https://glxtxxllmathvnvwduny.supabase.co'; // 프로젝트 URL
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdseHR4eGxsbWF0aHZudndkdW55Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5NDcxMzcsImV4cCI6MjEwNzUyMzEzN30.FCxCG9AzGpADLWwxy-J2e1tT2z-QPz6TGIkbx5KYba8';              // 복사한 anon key
+
+const sb = (window.supabase && SUPABASE_URL && SUPABASE_KEY)
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
+  : null;
+
+let isSignUpMode = false;
+let currentUser = null;
+
+function openAuthModal() {
+  document.getElementById('auth-modal')?.classList.remove('hidden');
+}
+
+function closeAuthModal() {
+  document.getElementById('auth-modal')?.classList.add('hidden');
+}
+
+function toggleAuthMode() {
+  isSignUpMode = !isSignUpMode;
+  document.getElementById('auth-modal-title').innerText = isSignUpMode ? '회원가입' : '로그인';
+  document.getElementById('auth-submit-btn').innerText = isSignUpMode ? '회원가입 완료' : '로그인';
+  document.getElementById('auth-toggle-text').innerText = isSignUpMode ? '이미 계정이 있으신가요?' : '계정이 없으신가요?';
+  document.getElementById('auth-toggle-btn').innerText = isSignUpMode ? '로그인' : '회원가입';
+}
+
+async function handleAuthSubmit(e) {
+  e.preventDefault();
+  if (!sb) return alert('Supabase 설정이 올바르지 않습니다.');
+
+  const email = document.getElementById('auth-email').value.trim();
+  const password = document.getElementById('auth-password').value.trim();
+
+  if (isSignUpMode) {
+    const { data, error } = await sb.auth.signUp({ email, password });
+    if (error) return alert('가입 실패: ' + error.message);
+    alert('회원가입 완료! 자동으로 로그인됩니다.');
+    closeAuthModal();
+  } else {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) return alert('로그인 실패: ' + error.message);
+    closeAuthModal();
+  }
+}
+
+async function handleLogout() {
+  if (!sb) return;
+  if (confirm('로그아웃 하시겠습니까?')) {
+    await sb.auth.signOut();
+    location.reload();
+  }
+}
+
+// ========================================================
+// [Supabase] 기기 간 데이터 동기화 (다운로드 / 업로드)
+// ========================================================
+
+// 1. 로그인 시 클라우드에서 최신 데이터를 가져와 localStorage에 반영
+async function syncDownFromSupabase() {
+  if (!sb || !currentUser) return;
+
+  try {
+    // 1) 캐릭터 동기화
+    const { data: chars } = await sb.from('characters').select('*');
+    if (chars && chars.length > 0) {
+      const formattedChars = chars.map(c => ({
+        id: c.id,
+        name: c.name,
+        intro: c.intro,
+        author: c.author,
+        version: c.version,
+        description: c.description,
+        systemPrompt: c.system_prompt,
+        avatar: c.avatar_url,
+        startScenarios: c.scenarios || []
+      }));
+      localStorage.setItem('crack_characters', JSON.stringify(formattedChars));
+      if (typeof renderCharacterFeed === 'function') renderCharacterFeed();
+    }
+
+    // 2) 페르소나 동기화
+    const { data: personas } = await sb.from('personas').select('*');
+    if (personas && personas.length > 0) {
+      const formattedPersonas = personas.map(p => ({
+        id: p.id,
+        name: p.name,
+        prompt: p.prompt,
+        avatar: p.avatar_url,
+        summary: p.summary
+      }));
+      localStorage.setItem('crack_personas', JSON.stringify(formattedPersonas));
+      if (typeof renderPersonaList === 'function') renderPersonaList();
+    }
+
+    if (typeof updateDashboardStats === 'function') updateDashboardStats();
+  } catch (err) {
+    console.error('동기화 실패:', err);
+  }
+}
+
+// 2. 캐릭터 생성/수정 시 Supabase로 업로드
+async function syncCharacterToDB(character) {
+  if (!sb || !currentUser) return;
+
+  await sb.from('characters').upsert({
+    id: character.id.startsWith('char-') ? undefined : character.id,
+    user_id: currentUser.id,
+    name: character.name,
+    intro: character.intro,
+    author: character.author,
+    version: character.version,
+    description: character.description,
+    system_prompt: character.systemPrompt,
+    avatar_url: character.avatar,
+    scenarios: character.startScenarios
+  });
+}
+
+// 세션 상태 감지 리스너
+if (sb) {
+  sb.auth.onAuthStateChange(async (event, session) => {
+    currentUser = session?.user || null;
+    const loginBtn = document.getElementById('btn-open-login');
+    const loggedInBox = document.getElementById('logged-in-box');
+    const emailBadge = document.getElementById('user-email-badge');
+
+    if (currentUser) {
+      loginBtn?.classList.add('hidden');
+      loggedInBox?.classList.remove('hidden');
+      if (emailBadge) emailBadge.innerText = currentUser.email;
+      await syncDownFromSupabase();
+    } else {
+      loginBtn?.classList.remove('hidden');
+      loggedInBox?.classList.add('hidden');
+    }
+  });
+}
+
+const DEFAULT_FALLBACK_AVATAR = 'https://api.dicebear.com/7.x/bottts/svg?seed=kolbom_default';
  let currentUploadedAvatarBase64 = '';
  let currentPersonaAvatarBase64 = '';
  let currentFeedGridCols = 3;
