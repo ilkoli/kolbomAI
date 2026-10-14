@@ -439,6 +439,17 @@ function navigate(viewName, params = {}, pushHistory = true) {
 
 // 🔥 [수정] 실제 화면 전환 및 URL/히스토리 갱신
 function performNavigate(viewName, params = {}, pushHistory = true) {
+  // 🔒 [추가] 대시보드 접근 제어: 미로그인 시 로그인 모달 호출 및 피드로 리다이렉트
+  if (viewName === 'dashboard' && !currentUser) {
+    openAuthModal();
+    // 로그인 안 된 상태에서는 피드 화면을 기본으로 보여줌
+    if (currentView === 'dashboard') {
+      viewName = 'characters';
+    } else {
+      return; // 다른 화면에 있었다면 화면 이동 자체를 취소
+    }
+  }
+
   // 열려있는 모달 닫기
   closeCharacterDetailModal();
   closeCharacterSessionModal();
@@ -451,6 +462,8 @@ function performNavigate(viewName, params = {}, pushHistory = true) {
   closeThemeModal();
   closeDraftListModal();
   closeLightbox();
+
+  currentView = viewName;
 
   currentView = viewName;
   const views = ['dashboard', 'characters', 'create', 'personas', 'chats', 'chatroom'];
