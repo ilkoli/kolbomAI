@@ -2723,6 +2723,7 @@ function handleCreateCharacter(e) {
         updatedAt: Date.now()
       };
       localStorage.setItem('crack_characters', JSON.stringify(chars));
+      syncCharacterToDB(chars[idx]);
       alert(`"${name}" 캐릭터 정보가 성공적으로 수정되었습니다!`);
     }
   } else {
