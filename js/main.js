@@ -551,9 +551,9 @@ window.addEventListener('popstate', (e) => {
   }
 });
 
-// 🔥 [추가] URL 해시 기반 자동 라우터
 function routeFromURL(pushHistory = false) {
-  const hash = window.location.hash.replace('#', '') || 'dashboard';
+  const defaultView = currentUser ? 'dashboard' : 'characters'; // 👈 로그인 여부에 따른 기본 뷰 분기
+  const hash = window.location.hash.replace('#', '') || defaultView;
   const [viewPart, queryPart] = hash.split('?');
   const params = {};
   if (queryPart) {
@@ -564,9 +564,16 @@ function routeFromURL(pushHistory = false) {
   }
 
   const validViews = ['dashboard', 'characters', 'create', 'personas', 'chats', 'chatroom'];
-  const viewName = validViews.includes(viewPart) ? viewPart : 'dashboard';
+  let viewName = validViews.includes(viewPart) ? viewPart : defaultView;
+
+  // 🔒 미로그인 상태로 #dashboard URL 직접 입력 진입 시 차단
+  if (viewName === 'dashboard' && !currentUser) {
+    viewName = 'characters';
+    openAuthModal();
+  }
+
   performNavigate(viewName, params, pushHistory);
- }
+}
 
  function updateDashboardStats() {
  const nickname = localStorage.getItem('user_profile_nickname') || '주인님';
