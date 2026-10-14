@@ -823,10 +823,11 @@
 
  <!-- Supabase 로그인 / 회원가입 모달 -->
 <div id="auth-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-[var(--bg)] p-4">
-  <div class="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-sm p-6 space-y-4 shadow-xl">
-    <div class="flex items-center justify-between pb-2 border-b border-[var(--border)]">
+  <div class="bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-sm p-6 space-y-4 shadow-2xl">
+    <div class="flex items-center justify-between pb-2 border-b border-[var(--border)]/30">
       <h3 id="auth-modal-title" class="text-base font-bold text-[var(--ink)]">로그인</h3>
-      <button onclick="closeAuthModal()" class="text-[var(--muted)] hover:text-[var(--ink)] text-sm">✕</button>
+      <!-- 🔒 로그인 전에는 닫을 수 없도록 닫기 버튼에 id 부여 및 숨김 처리 -->
+      <button id="auth-close-btn" type="button" onclick="closeAuthModal()" class="hidden text-[var(--muted)] hover:text-[var(--ink)]"><i data-lucide="x" class="w-4 h-4"></i></button>
     </div>
 
     <form id="auth-form" onsubmit="handleAuthSubmit(event)" class="space-y-3">
